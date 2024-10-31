@@ -1,0 +1,464 @@
+
+R version 4.4.0 (2024-04-24) -- "Puppy Cup"
+Copyright (C) 2024 The R Foundation for Statistical Computing
+Platform: x86_64-redhat-linux-gnu
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> ###############################################################################
+> #
+> #
+> # Simulation Study: Importance Sampling Method
+> #
+> #
+> ###############################################################################
+> 
+> 
+> 
+> 
+> 
+> ############################### Initialization ################################
+> 
+> ### clear IDE
+> rm(list = ls()); gc(); cat("\14")
+         used (Mb) gc trigger (Mb) max used (Mb)
+Ncells 294522 15.8     692480   37   478571 25.6
+Vcells 510926  3.9    8388608   64  1924517 14.7
+> 
+> ### set sequential computation for all workers
+> Sys.setenv(OPENBLAS_NUM_THREADS = 1)
+> Sys.setenv(MKL_NUM_THREADS = 1)
+> Sys.setenv(OMP_NUM_THREADS = 1)
+> Sys.setenv(BLIS_NUM_THREADS = 1)
+> Sys.setenv(FFTW_NUM_THREADS = 1)
+> 
+> ### set the seed
+> set.seed(1994)
+> 
+> 
+> 
+> 
+> ########## simulation study framework
+> 
+> ### sample size
+> n = 50
+> 
+> ### number of parameters
+> p = 1000
+> 
+> ### minimum total number of iterations (it will be ceiled according to number
+> #    of workers)
+> niter = 1e+4
+> 
+> ### prior variance-covariance matrix
+> Sigma = diag(52.6379, nrow = p)
+> 
+> ### prior mean vector
+> mu = rep(0, p)
+> 
+> ### number of simulations
+> nsim = 1e+4
+> 
+> ### sequence of empirical quantiles to be stored for each iteration
+> seq_quant = c(1:19) * 0.05
+> 
+> 
+> 
+> 
+> ######################## Sim Study: coverage analysis #########################
+> 
+> ########## parallel environment setup
+> 
+> ### get cluster
+> cluster = parallel::makeCluster(24)
+> 
+> ### number of iterations per worker
+> niterWorker = ceiling(niter / length(cluster))
+> 
+> ### true number of iterations after ceiling
+> niter = niterWorker * length(cluster)
+> 
+> ### export variables
+> parallel::clusterExport(cl = cluster, varlist = ls(all.names = TRUE))
+> 
+> ### identify cluster
+> for (worker in 1:length(cluster)) {
++   parallel::clusterExport(cl = cluster[worker], "worker")
++ }; rm("worker")
+> 
+> ### open report files
+> invisible(
++   parallel::clusterEvalQ(cl = cluster, {
++     sink(paste("reportWorker", worker, ".txt", sep = ""))
++   })
++ )
+> 
+> ### set seed
+> parallel::clusterSetRNGStream(cl = cluster)
+> 
+> 
+> 
+> 
+> ### run in parallel the external script in the previous upper level
+> parallel::clusterEvalQ(
++   cl = cluster, expr = source("../SimStudyIS_ExeScript.R")
++ )
+[[1]]
+[[1]]$value
+NULL
+
+[[1]]$visible
+[1] FALSE
+
+
+[[2]]
+[[2]]$value
+NULL
+
+[[2]]$visible
+[1] FALSE
+
+
+[[3]]
+[[3]]$value
+NULL
+
+[[3]]$visible
+[1] FALSE
+
+
+[[4]]
+[[4]]$value
+NULL
+
+[[4]]$visible
+[1] FALSE
+
+
+[[5]]
+[[5]]$value
+NULL
+
+[[5]]$visible
+[1] FALSE
+
+
+[[6]]
+[[6]]$value
+NULL
+
+[[6]]$visible
+[1] FALSE
+
+
+[[7]]
+[[7]]$value
+NULL
+
+[[7]]$visible
+[1] FALSE
+
+
+[[8]]
+[[8]]$value
+NULL
+
+[[8]]$visible
+[1] FALSE
+
+
+[[9]]
+[[9]]$value
+NULL
+
+[[9]]$visible
+[1] FALSE
+
+
+[[10]]
+[[10]]$value
+NULL
+
+[[10]]$visible
+[1] FALSE
+
+
+[[11]]
+[[11]]$value
+NULL
+
+[[11]]$visible
+[1] FALSE
+
+
+[[12]]
+[[12]]$value
+NULL
+
+[[12]]$visible
+[1] FALSE
+
+
+[[13]]
+[[13]]$value
+NULL
+
+[[13]]$visible
+[1] FALSE
+
+
+[[14]]
+[[14]]$value
+NULL
+
+[[14]]$visible
+[1] FALSE
+
+
+[[15]]
+[[15]]$value
+NULL
+
+[[15]]$visible
+[1] FALSE
+
+
+[[16]]
+[[16]]$value
+NULL
+
+[[16]]$visible
+[1] FALSE
+
+
+[[17]]
+[[17]]$value
+NULL
+
+[[17]]$visible
+[1] FALSE
+
+
+[[18]]
+[[18]]$value
+NULL
+
+[[18]]$visible
+[1] FALSE
+
+
+[[19]]
+[[19]]$value
+NULL
+
+[[19]]$visible
+[1] FALSE
+
+
+[[20]]
+[[20]]$value
+NULL
+
+[[20]]$visible
+[1] FALSE
+
+
+[[21]]
+[[21]]$value
+NULL
+
+[[21]]$visible
+[1] FALSE
+
+
+[[22]]
+[[22]]$value
+NULL
+
+[[22]]$visible
+[1] FALSE
+
+
+[[23]]
+[[23]]$value
+NULL
+
+[[23]]$visible
+[1] FALSE
+
+
+[[24]]
+[[24]]$value
+NULL
+
+[[24]]$visible
+[1] FALSE
+
+
+> 
+> 
+> 
+> 
+> ########## parallel environment strip
+> 
+> ##### initialize merging results objects
+> 
+> ### time in secs vector
+> timesSecs = double(length = niter)
+> 
+> ### effective sample size vector
+> effSamplSize = double(length = niter)
+> 
+> ### true beta (intercept and not intercept) matrix
+> trueBeta = matrix(nrow = 2, ncol = niter, dimnames = list(
++   beta = c("intercept", "notIntercept"), iter = 1:niter
++ ))
+> 
+> ### empirical quantiles array
+> empQuant = array(
++   data = NA,
++   dim = c(2, length(seq_quant), niter),
++   dimnames = list(
++     beta = c("intercept", "notIntercept"),
++     quantiles = seq_quant, iter = 1:niter
++   )
++ )
+> 
+> ### temporary environment for workers variables
+> tmpEnvWorker = new.env()
+> 
+> 
+> 
+> ##### merge results
+> for (iworker in 0:(length(cluster)-1)) {
++ 
++   ### load worker environment
++   load(
++     paste("tmpWorker", iworker + 1, ".RData", sep = ""),
++     envir = tmpEnvWorker
++   )
++ 
++   ### get times
++   timesSecs[
++     (iworker * niterWorker + 1) : (iworker * niterWorker + niterWorker)
++   ] = tmpEnvWorker$timesSecs
++ 
++   ### get effective sample size
++   effSamplSize[
++     (iworker * niterWorker + 1) : (iworker * niterWorker + niterWorker)
++   ] = tmpEnvWorker$effSamplSize
++ 
++   ### get true beta
++   trueBeta[
++     , (iworker * niterWorker + 1) : (iworker * niterWorker + niterWorker)
++   ] = tmpEnvWorker$trueBeta
++ 
++   ### get empirical quantiles
++   empQuant[
++     , , (iworker * niterWorker + 1) : (iworker * niterWorker + niterWorker)
++   ] = tmpEnvWorker$empQuant
++ 
++ }; rm(list = c("iworker", "tmpEnvWorker"))
+> 
+> 
+> 
+> ### close report file
+> parallel::clusterEvalQ(cl = cluster, sink())
+[[1]]
+NULL
+
+[[2]]
+NULL
+
+[[3]]
+NULL
+
+[[4]]
+NULL
+
+[[5]]
+NULL
+
+[[6]]
+NULL
+
+[[7]]
+NULL
+
+[[8]]
+NULL
+
+[[9]]
+NULL
+
+[[10]]
+NULL
+
+[[11]]
+NULL
+
+[[12]]
+NULL
+
+[[13]]
+NULL
+
+[[14]]
+NULL
+
+[[15]]
+NULL
+
+[[16]]
+NULL
+
+[[17]]
+NULL
+
+[[18]]
+NULL
+
+[[19]]
+NULL
+
+[[20]]
+NULL
+
+[[21]]
+NULL
+
+[[22]]
+NULL
+
+[[23]]
+NULL
+
+[[24]]
+NULL
+
+> 
+> ### leave cluster
+> parallel::stopCluster(cl = cluster)
+> 
+> 
+> 
+> 
+> 
+> ################################### Closure ###################################
+> save(list = ls(), file = paste("SimStudyIS_n", n, "p", p, ".RData", sep = ""))
+> 
+> proc.time()
+    user   system  elapsed 
+  39.824    3.862 7859.953 

@@ -1,0 +1,400 @@
+
+R version 4.3.1 (2023-06-16) -- "Beagle Scouts"
+Copyright (C) 2023 The R Foundation for Statistical Computing
+Platform: x86_64-redhat-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> ##########################################################################################
+> #
+> # 
+> # Lung Cancer: Gibbs Variable Selection Via Bayes Factor
+> # 
+> #
+> ##########################################################################################
+> 
+> 
+> 
+> 
+> 
+> ############################## Initialization ----
+> 
+> Sys.setenv(OPENBLAS_NUM_THREADS=1)
+> Sys.setenv(MKL_NUM_THREADS=1)
+> Sys.setenv(OMP_NUM_THREADS=1)
+> 
+> ### clear IDE
+> rm(list = ls()); gc(); cat("\14")
+         used (Mb) gc trigger (Mb) max used (Mb)
+Ncells 283211 15.2     664425 35.5   451317 24.2
+Vcells 486810  3.8    8388608 64.0  1815523 13.9
+> 
+> ### info objects list
+> .myINFO = list()
+> 
+> ### system info
+> # general info
+> .myINFO[["general"]] = c(
++   Sys.info()[1:5], "language" = R.version$version.string, Sys.info()[7]
++ )
+> # wd object
+> .myINFO[["general"]][["directory"]] = getwd()
+> # task name
+> .myINFO[["general"]][["task"]] = "LungCancer_VarSel"
+> 
+> ### start time counter
+> .myINFO[["times"]] = list(start = Sys.time(), end = NA)
+> 
+> 
+> 
+> 
+> ########## packages
+> 
+> ### check package
+> .myINFO[["checkPKG"]] = function(x){
++   if( !x %in% installed.packages() ){
++     stop( paste("package", x, "is not installed", sep = " ") )
++   }
++ }
+> 
+> ### packages vector
+> .myINFO[["packages"]] = c(
++   rev(.packages()),
++   "parallel"
++ )
+> 
+> ### apply checkPKG to packages (if it is necessary)
+> if( !is.null(.myINFO[["packages"]]) ){
++   invisible(lapply( .myINFO[["packages"]], .myINFO[["checkPKG"]] ))
++ }
+> 
+> 
+> 
+> 
+> ########## functions
+> 
+> ### load function
+> .myINFO[["loadFUN"]] = function(x){
++   if( file.exists(paste(getwd(),"/", x, ".R", sep="")) ){
++     source(paste(getwd(),"/", x, ".R", sep=""))
++   }else if( file.exists(paste(.libPaths()[1],"/myFUN/", x, ".R", sep="")) ){
++     source(paste(.libPaths()[1],"/myFUN/", x, ".R", sep=""))
++   }else{
++     stop(paste("there is not the function", x, sep = " "))
++   }
++ }
+> 
+> ### functions vector
+> .myINFO[["functions"]] = c(
++   "LSBR_LogitGauss_VarSel",
++   "LSBR_ProbitGauss_VarSel"
++ )
+> 
+> ### apply loadfunction to functions (if it is necessary)
+> if( !is.null(.myINFO[["functions"]]) ){
++   invisible(lapply( .myINFO[["functions"]], .myINFO[["loadFUN"]] ))
++ }
+> 
+> 
+> 
+> 
+> 
+> ############################## part I: Get Proposal for Variable Selection ----
+> 
+> ### load data
+> load("processedDataset_LungCancer.RData")
+> 
+> ### rename
+> X = X_LungCancer
+> y = y_LungCancer
+> 
+> ### prior mean vector
+> mu = rep( 0, ncol(X) )
+> 
+> ### prior variance-covariance matrix
+> # logit
+> logitSigma = diag( (pi*4/sqrt(3))^2, nrow = ncol(X) )
+> # probit
+> probitSigma = diag( 16, nrow = ncol(X) )
+> 
+> ### number of simulations in MCMC
+> nsim = 1e+3
+> 
+> ### number of simulations in importance sampling
+> ntim = 1e+4
+> 
+> ### get cluster
+> cluster = parallel::makeCluster(24)
+> 
+> ### export environment to workers
+> parallel::clusterExport( cl = cluster, varlist = ls(all.names = TRUE) )
+> 
+> ### set cluster seed
+> parallel::clusterSetRNGStream(cl = cluster, iseed = 1984)
+> 
+> ### identify cluster
+> for( iclu in 1:length(cluster) ){
++   parallel::clusterExport(cl = cluster[iclu], "iclu")
++ }
+> 
+> ### open report file
+> parallel::clusterEvalQ(
++   cl = cluster, expr = { sink(paste("report", iclu, ".txt", sep = "")) }
++ )
+[[1]]
+NULL
+
+[[2]]
+NULL
+
+[[3]]
+NULL
+
+[[4]]
+NULL
+
+[[5]]
+NULL
+
+[[6]]
+NULL
+
+[[7]]
+NULL
+
+[[8]]
+NULL
+
+[[9]]
+NULL
+
+[[10]]
+NULL
+
+[[11]]
+NULL
+
+[[12]]
+NULL
+
+[[13]]
+NULL
+
+[[14]]
+NULL
+
+[[15]]
+NULL
+
+[[16]]
+NULL
+
+[[17]]
+NULL
+
+[[18]]
+NULL
+
+[[19]]
+NULL
+
+[[20]]
+NULL
+
+[[21]]
+NULL
+
+[[22]]
+NULL
+
+[[23]]
+NULL
+
+[[24]]
+NULL
+
+> 
+> ### run
+> LungCancer_VarSelMCMCres = parallel::clusterApply(
++   cl = cluster, x = c( 1:length(cluster) ), fun = function(xapp){
++     
++     print(paste( "iteration ", xapp, " start at time ", Sys.time(), sep = "" ))
++     
++     logitRes =  LSBR_LogitGauss_VarSel(
++       nsim = nsim, X, y, mu, logitSigma, ntim = ntim, nuSUT = 100,
++       verbose = 1
++     )
++     
++     probitRes =  LSBR_ProbitGauss_VarSel(
++       nsim = nsim, X, y, mu, probitSigma, ntim = ntim
++     )
++     
++     return(list(
++       logitRes = logitRes,
++       probitRes = probitRes
++     ))
++     
++   }
++ )
+> 
+> ### close report file
+> parallel::clusterEvalQ( cl = cluster, expr = {sink()} )
+[[1]]
+NULL
+
+[[2]]
+NULL
+
+[[3]]
+NULL
+
+[[4]]
+NULL
+
+[[5]]
+NULL
+
+[[6]]
+NULL
+
+[[7]]
+NULL
+
+[[8]]
+NULL
+
+[[9]]
+NULL
+
+[[10]]
+NULL
+
+[[11]]
+NULL
+
+[[12]]
+NULL
+
+[[13]]
+NULL
+
+[[14]]
+NULL
+
+[[15]]
+NULL
+
+[[16]]
+NULL
+
+[[17]]
+NULL
+
+[[18]]
+NULL
+
+[[19]]
+NULL
+
+[[20]]
+NULL
+
+[[21]]
+NULL
+
+[[22]]
+NULL
+
+[[23]]
+NULL
+
+[[24]]
+NULL
+
+> 
+> ### leave cluster
+> parallel::stopCluster(cluster)
+> 
+> ### save object
+> save(list = c("LungCancer_VarSelMCMCres"), file = "LungCancer_VarSelMCMCres.RData")
+> 
+> 
+> 
+> 
+> ############################## Closure ----
+> 
+> ##### adjust final environment
+> 
+> ### remove objects to not be save
+> #rm(list = c())
+> 
+> ### load objects to be save
+> #for(i_reLoad in c()){
+> # load(i_reLoad)
+> #};rm(i_reLoad)
+> 
+> 
+> 
+> ##### stop chronometer
+> 
+> ### end time counter
+> .myINFO[["times"]]$end = Sys.time()
+> 
+> ### time counter difference
+> .myINFO[["times"]]$elapsed = difftime(
++   .myINFO[["times"]]$end,
++   .myINFO[["times"]]$start
++ )
+> 
+> 
+> 
+> ### rename .myINFO
+> assign(paste(.myINFO[["general"]][["task"]], sep = ""), .myINFO)
+> 
+> ### save script environment except .myINFO
+> save(
++   list = setdiff(ls(all.names = TRUE), ".myINFO"),
++   file = paste(.myINFO[["general"]]["task"], ".RData", sep = "")
++ )
+> 
+> ### display elapsed time 
+> print(.myINFO[["times"]]$elapsed)
+Time difference of 7.475657 days
+> 
+> ### remove .myINFO
+> rm(.myINFO)
+> 
+> 
+> 
+> 
+> 
+> ############################## Appendix ----
+> 
+> # some text if it is necessary
+> 
+> if(FALSE){ # appendix is not run
++   
++   # merger
++   dim(LungCancer_VarSelMCMCres)
++   
++   ###############
++   
++   #
++   
++ }
+> 
+> proc.time()
+      user     system    elapsed 
+     1.025      0.158 645897.176 
