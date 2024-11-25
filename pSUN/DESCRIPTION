@@ -3,7 +3,7 @@ Title: Perturbed Unified Skew Normal
 Version: 0.0.0.9000
 Authors@R: 
     c(person("Paolo", "Onorati", role=c("aut","cre")),
-      person("Brunero", "Liseo", role="aut")
+      person("Brunero", "Liseo", role="aut"))
 Description: Implementation of pSUN distribution for Bayesian binary linear regression models.
 License: GPL-3
 Imports: GIGrvg, TruncatedNormal, matrixStats, nleqslv, statmod, truncnorm
